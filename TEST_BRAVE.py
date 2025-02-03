@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import os
 
 # 替换为您的DeepSeek API密钥
 DEEPSEEK_API_KEY = "sk-78af28495b7249e280efae4eb52a12bc"
@@ -11,7 +10,6 @@ TXT_FILE_PATH = "阿德勒的哲学课（共4册）.txt"
 
 # 用于存储分割后的文本片段
 text_chunks = []
-
 
 # 加载并分割文本文件
 def load_and_split_text(file_path, chunk_size=10000):
@@ -24,9 +22,7 @@ def load_and_split_text(file_path, chunk_size=10000):
         st.error(f"Error loading or splitting text: {e}")
         return []
 
-
 text_chunks = load_and_split_text(TXT_FILE_PATH)
-
 
 # 分析用户输入的情感
 def analyze_sentiment(text):
@@ -43,7 +39,6 @@ def analyze_sentiment(text):
         st.error(f"Sentiment analysis failed: {e}")
         return 'neutral'
 
-
 # 根据用户情感返回合适的心理练习
 def get_psychological_exercise(sentiment):
     exercises = {
@@ -53,18 +48,23 @@ def get_psychological_exercise(sentiment):
     }
     return exercises.get(sentiment, "让我们一起探索你的内心世界。")
 
-
 # Streamlit界面
 st.title("阿德勒心理医生")
 
-user_message = st.text_input("请输入您的问题或感受:")
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 
-if st.button("提交"):
+# 显示所有历史消息
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+# 用户输入
+user_message = st.chat_input("请输入您的问题或感受:")
+
+if user_message:
     sentiment = analyze_sentiment(user_message)
     exercise = get_psychological_exercise(sentiment)
-
-    st.write("情感分析结果:", sentiment)
-    st.write("建议的心理练习:", exercise)
 
     system_message = "你是阿德勒，一位心理医生。你语气温和、耐心，善于倾听并提供专业的心理建议。\n"
     system_message += f"{exercise}\n"
@@ -88,6 +88,15 @@ if st.button("提交"):
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data)
         response.raise_for_status()
         ai_response = response.json().get('choices')[0].get('message').get('content').strip()
-        st.write("AI回复:", ai_response)
+
+        # 添加用户消息和AI回复到会话状态中
+        st.session_state.messages.append({"role": "user", "content": user_message})
+        st.session_state.messages.append({"role": "assistant", "content": ai_response})
+
+        # 直接在对话中显示用户输入和AI回复
+        with st.chat_message("user"):
+            st.write(user_message)
+        with st.chat_message("assistant"):
+            st.write(ai_response)
     except requests.exceptions.RequestException as e:
         st.error(f"API request failed: {e}")
